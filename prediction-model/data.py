@@ -16,20 +16,25 @@ from sklearn.model_selection import train_test_split
 
 
 class Data:
-    """Class to read the dataset, clean it and store it in cache as a pandas pickle."""
+    """Class to read the trips dataset, clean it, extract a simulation set from it and prepare the 
+    ML dataset for the Prediction class."""
 
     def __init__(self,
                  grid_square_size: float = None,
                  latitude_divisions: int = None,
                  data_folder_path: str = 'data',
-                 use_cached_taxi_dataset: bool = True,
+                 trips_data_path: str = 'data/trips_shrunk.csv',
+                 use_cached_taxi_dataset: bool = False, # DEPRECATED
                  use_cached_ml_dataset: bool = True,
                  ml_df_to_compare_fname=None,
+                 simulation_set_cutoff_date='2021-11-17 00:00:00',
                  debug=False):
 
         self.data_folder_path = os.path.join(data_folder_path)
         self.square_size = None
         self.seed = 144
+        self.trips_data_path = trips_data_path
+        self.cutoff_date = simulation_set_cutoff_date
 
         self.labels = {
             'time': 'Trip Start Timestamp',
@@ -60,7 +65,6 @@ class Data:
         self.df = self.load_taxi_data(use_cached=use_cached_taxi_dataset)
         self.df.sort_values(self.labels['time'], inplace=True)
         self.df.reset_index(drop=True, inplace=True)
-        self.extract_simulator_dataset()
         
         if grid_square_size:
             self.square_coords = self.bin_city_coordinates(square_size=grid_square_size)
@@ -89,7 +93,6 @@ class Data:
 
     def extract_simulator_dataset(self, use_cached_taxi_dataset):
         # Extract test_set for simulator (5% random sample or continuous subset in time)
-        self.cutoff_date = '2021-11-17 00:00:00'
         self.test_set = self.df[self.df.loc[:, self.labels['time']] >= self.cutoff_date]
         if not use_cached_taxi_dataset or not os.path.isfile(os.path.join(self.data_folder_path, 'test_trips.csv')):
             self.test_set.to_csv(os.path.join(self.data_folder_path, 'test_trips.csv'))
@@ -119,11 +122,11 @@ class Data:
             self.ml_df = pd.DataFrame(columns=self.ml_df_labels)
             self.add_ml_df_coord_labels()
             for chunk in pd.read_csv(
-                'data/train_trips.csv',
+                os.path.join('data', 'train_trips.csv'),
                 # usecols=self.labels.values(),
                 parse_dates=[self.labels['time']],
                 on_bad_lines='warn',
-                chunksize=15000000,
+                chunksize=10000000,
                 # nrows=235000
             ):
                 print(f"Counting requests in chunk {cnt}:")
@@ -144,7 +147,8 @@ class Data:
         The cached version is subsequently used by default: delete the .pkl
         file to use another csv file.
         """
-        csv_path = os.path.join(self.data_folder_path, 'trips_shrunk.csv')
+        # csv_path = os.path.join(self.data_folder_path, 'trips_shrunk.csv')
+        csv_path = self.trips_data_path
         pickle_path = os.path.join(self.data_folder_path, 'clean_trips.pkl')
 
         cols_datatypes = {
@@ -162,7 +166,7 @@ class Data:
             print("Reading CSV...")
             for chunk in pd.read_csv(
                 csv_path,
-                # usecols=self.labels.values(),
+                usecols=self.labels.values(),
                 dtype=cols_datatypes,
                 parse_dates=[self.labels['time']],
                 on_bad_lines='warn',
@@ -173,7 +177,8 @@ class Data:
             data = pd.concat(data)
             print(f"Dropped {self.dropped_rows_cnt} rows containing NaN values, equal to {(self.dropped_rows_cnt / self.original_df_size * 100):2f}%")
             print(f"Dropped {self.dropped_invalid} rows containing invalid coordinates")
-            self.cache_dataframe(dataframe=data, fname='clean_trips.pkl')
+            # self.cache_dataframe(dataframe=data, fname='clean_trips.pkl')
+            self.extract_simulator_dataset()
         return data
 
     def cache_dataframe(self, dataframe: pd.DataFrame, fname: str):

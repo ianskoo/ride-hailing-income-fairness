@@ -1,6 +1,4 @@
 """Instantiates the package classes and runs the program."""
-from cgi import test
-from functools import cache
 from multiprocessing.spawn import prepare
 import data
 import map_plotting as map_plt
@@ -44,10 +42,13 @@ def build_df_and_train():
 
 if __name__ == '__main__':
     
-    data_1 = data.Data(# grid_square_size=4,
-                   latitude_divisions=7,
-                   use_cached_taxi_dataset=False,
-                   use_cached_ml_dataset=True)
+    data_1 = data.Data(
+        trips_data_path="/home/chris/Documents/UNI/HS21/bachelor_thesis/code/ride-hailing-demand-prediction/data/trips.csv",
+        # grid_square_size=0.1,
+        latitude_divisions=4,
+        use_cached_ml_dataset=False,
+        simulation_set_cutoff_date='2021-11-17 00:00:00',
+    )
 
     # build_df_and_train()
         # grid_search(pr)
