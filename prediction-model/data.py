@@ -28,13 +28,15 @@ class Data:
                  use_cached_ml_dataset: bool = True,
                  ml_df_to_compare_fname=None,
                  simulation_set_cutoff_date='2021-11-17 00:00:00',
+                 n_threads=8,
                  debug=False):
 
-        self.data_folder_path = os.path.join(data_folder_path)
+        self.data_folder_path = data_folder_path
         self.square_size = None
         self.seed = 144
         self.trips_data_path = trips_data_path
         self.cutoff_date = simulation_set_cutoff_date
+        self.n_threads = n_threads
 
         self.labels = {
             'time': 'Trip Start Timestamp',
@@ -65,6 +67,7 @@ class Data:
         self.df = self.load_taxi_data(use_cached=use_cached_taxi_dataset)
         self.df.sort_values(self.labels['time'], inplace=True)
         self.df.reset_index(drop=True, inplace=True)
+        self.extract_simulator_dataset(use_cached_taxi_dataset)
         
         if grid_square_size:
             self.square_coords = self.bin_city_coordinates(square_size=grid_square_size)
@@ -130,8 +133,8 @@ class Data:
                 # nrows=235000
             ):
                 print(f"Counting requests in chunk {cnt}:")
-                self.ml_df = pd.concat([self.ml_df, self.parallelize_dataframe(chunk, self.demand_per_timestep_date)])
-                print(self.ml_df)
+                self.ml_df = pd.concat([self.ml_df, self.parallelize_dataframe(chunk, self.demand_per_timestep_date, self.n_threads)])
+                # print(self.ml_df)
                 cnt += 1
             
             # Sum counts of duplicated time steps (caused by chunking and multihtreading)   
@@ -163,7 +166,7 @@ class Data:
             data = pd.read_pickle(pickle_path)
         else:
             data = []
-            print("Reading CSV...")
+            print("Reading CSV in chunks. Cleaning, sorting, and caching dataset, this will take a while.")
             for chunk in pd.read_csv(
                 csv_path,
                 usecols=self.labels.values(),
@@ -172,13 +175,14 @@ class Data:
                 on_bad_lines='warn',
                 chunksize=10000000,
                 # nrows=235000
-            ):
+                ):
                 data.append(self.clean_data_cols(chunk))
+            
+            print('\n\n')
             data = pd.concat(data)
             print(f"Dropped {self.dropped_rows_cnt} rows containing NaN values, equal to {(self.dropped_rows_cnt / self.original_df_size * 100):2f}%")
             print(f"Dropped {self.dropped_invalid} rows containing invalid coordinates")
             # self.cache_dataframe(dataframe=data, fname='clean_trips.pkl')
-            self.extract_simulator_dataset()
         return data
 
     def cache_dataframe(self, dataframe: pd.DataFrame, fname: str):
@@ -191,18 +195,17 @@ class Data:
         # df.info()
         original_size = df.shape[0]
         self.original_df_size += original_size
-        print("Cleaning, sorting, and caching dataset...")
 
         # Drop rows without coordinates
         df.dropna(inplace=True)
-        dropped_cnt = original_size - df.shape[0]
+        self.dropped_rows_cnt = original_size - df.shape[0]
         # print(f"Dropped {dropped_cnt} rows containing NaN values, equal to {dropped_cnt / original_size * 100 :2f}%")
 
         # Drop rows with invalid float coordinates
         for label in list(self.labels.values())[1:]:
             df.drop(index=df[df[label].astype(str).str.count(reg) > 0].index, inplace=True)
         # print(f"Dropped {original_size - df.shape[0] - dropped_cnt} rows containing invalid coordinates")
-        self.dropped_invalid += original_size - df.shape[0] - dropped_cnt
+        self.dropped_invalid += original_size - df.shape[0] - self.dropped_rows_cnt
         # dropped_cnt = original_size - df.shape[0]
 
         # Changing datatype of column to float
@@ -218,6 +221,7 @@ class Data:
 
         # Save changes (not here when using chunks)
         # self.cache_dataframe(dataframe=df, fname='clean_trips.pkl')
+        print(".", end="")
         return df
 
     def bin_city_coordinates(self, lat_divisions=None, square_size=None) -> list:
@@ -362,12 +366,12 @@ class Data:
     #     for timestep in timesteps:
     #         for square in self.square_coords
 
-    def parallelize_dataframe(self, data, func, n_cores=10):
+    def parallelize_dataframe(self, data, func, n_threads=8):
         # ml_df = pd.DataFrame(columns=self.ml_df_labels)
         
         # Divide dataset equally
         # self.df.sort_values(self.labels['time'], inplace=True)
-        df_split = np.array_split(data, n_cores)
+        df_split = np.array_split(data, n_threads)
 
         # Start and assign threads, concatenate resulting dataframes
         pool = Pool(len(df_split))

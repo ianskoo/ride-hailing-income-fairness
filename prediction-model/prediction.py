@@ -20,7 +20,14 @@ from sklearn.multioutput import MultiOutputRegressor
 class Prediction:
     """Predict ride hailing customers demand in a city"""
 
-    def __init__(self, prepared_dataset, fst_square: tuple, poly_degree=1) -> None:
+    def __init__(self, 
+                 prepared_dataset, 
+                 fst_square: tuple, 
+                 poly_degree=1,
+                 max_features=8, 
+                 n_estimators=300, 
+                 max_depth=100) -> None:
+        
         self.ml_df = prepared_dataset
         self.seed = 144
         self.x_fst_label = 'is_holiday'
@@ -37,7 +44,9 @@ class Prediction:
         self.y_test = self.test_set.loc[:, self.y_fst_label:]
 
         # Train the final model with final hyperparameters
-        self.model = self.train_model(RandomForestRegressor(max_features=8, n_estimators=300, max_depth=100))
+        self.model = self.train_model(RandomForestRegressor(max_features=max_features,
+                                                            n_estimators=n_estimators, 
+                                                            max_depth=max_depth))
 
     def preprocess(self, data, poly_degree):
         # num_pipeline = Pipeline([
@@ -118,7 +127,7 @@ class Prediction:
                 # for i in (row_idx, key, val, row):
                 #     print(i)
 
-        self.models_df.to_csv('data/random_forest_tuning_acc.csv')
+        self.models_df.to_csv('data/model_selection.csv')
 
     def check_error(self, print=True, model=RandomForestRegressor(max_depth=100, max_features=8, n_estimators=300)):
         # scores = cross_val_score(model, self.x, self.y, scoring='neg_mean_squared_error', cv=5)
@@ -149,7 +158,7 @@ class Prediction:
             ]
             model = RandomForestRegressor()
 
-        elif model_name == "ridge_regression":
+        elif model_name == "ridge":
             param_grid = [
                 {'alpha': [0.01, 0.03, 0.1, 0.3, 1]}
             ]
