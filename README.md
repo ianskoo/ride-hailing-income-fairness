@@ -118,5 +118,7 @@ After this last step is finished, you can continue along following the Python no
 
 ## Simulations
 
+The simulations are performed with a modified and improved version of [this taxi simulator](https://github.com/bokae/taxi). The basic instructions in their Github repository apply, but I streamlied the batch simulations process in one single Python script named `ml_dispatcher_comparison_batch_run.py`. In this script there's a dictionary containing a basic configuration, some helper functions, and the "main" code at the end. In here, various combinations of parameters can be modified in the base config dictionary and simulations can be run with them. A copy of the modified configuration will be saved in `simulator/configs/`, so you can inspect all the configurations I have already used for my thesis. It is therefore superfluous to use `generate_configs.py` and `batch_run.sh`.
 
+The simulation results are saved in `simulator/results/` and can be read and analized using (and perhaps slightly adapting) the scripts in `results_and_plots.ipynb`.
 

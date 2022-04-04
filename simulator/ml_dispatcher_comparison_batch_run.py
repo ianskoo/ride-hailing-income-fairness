@@ -5,6 +5,7 @@ import sys
 
 from city_model import Simulation
 
+# Basic simulator settings including Chicago additions
 config = {
     "use_chicago": True,
     "chicago_grid_size": 49,
